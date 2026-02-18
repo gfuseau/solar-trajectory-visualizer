@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Trajectory: Global Perspectives</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #1e293b;
+            --text: #e2e8f0;
+            --accent: #f59e0b; /* Amber 500 */
+            --accent-glow: rgba(245, 158, 11, 0.3);
+            --path-day: #3b82f6;
+            --path-night: #1e293b;
+            --grid: #334155;
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        h1 {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+            max-width: 1000px;
+        }
+        .canvas-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .canvas-wrapper {
+            position: relative;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 70%);
+            border-radius: 50%;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+            width: 360px;
+            height: 360px;
+            border: 2px solid var(--grid);
+        }
+        canvas {
+            display: block;
+            border-radius: 50%;
+        }
+        .controls {
+            flex: 1;
+            min-width: 300px;
+            background: var(--panel);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+        .val {
+            color: var(--accent);
+            font-weight: bold;
+            font-variant-numeric: tabular-nums;
+        }
+        select {
+            width: 100%;
+            padding: 8px;
+            background: #0f172a;
+            border: 1px solid var(--grid);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent);
+        }
+        .readout-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+            padding-top: 15px;
+            border-top: 1px solid var(--grid);
+        }
+        .readout-item {
+            background: rgba(0,0,0,0.2);
+            padding: 8px;
+            border-radius: 6px;
+            text-align: center;
+        }
+        .readout-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 2px;
+        }
+        .readout-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .note {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin-top: 10px;
+            line-height: 1.4;
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 3px solid var(--accent);
+            padding: 10px;
+        }
+        .legend-box {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 15px;
+            text-align: left;
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            line-height: 1.6;
+        }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .line-sample { width: 15px; height: 3px; display: inline-block; }
+        
+        /* Compass Markers */
+        .compass-label {
+            position: absolute;
+            font-weight: bold;
+            color: var(--grid);
+            font-size: 0.9rem;
+            pointer-events: none;
+        }
+        .cl-n { top: 10px; left: 50%; transform: translateX(-50%); color: #ef4444; } /* North Red */
+        .cl-s { bottom: 10px; left: 50%; transform: translateX(-50%); }
+        .cl-e { right: 10px; top: 50%; transform: translateY(-50%); }
+        .cl-w { left: 10px; top: 50%; transform: translateY(-50%); }
+
+    </style>
+</head>
+<body>
+
+    <h1>Sky Dome Visualizer</h1>
+
+    <div class="container">
+        <!-- Visualization Area -->
+        <div class="canvas-container">
+            <div class="canvas-wrapper">
+                <canvas id="skyCanvas" width="360" height="360"></canvas>
+                <div class="compass-label cl-n">N</div>
+                <div class="compass-label cl-s">S</div>
+                <div class="compass-label cl-e">E</div>
+                <div class="compass-label cl-w">W</div>
+            </div>
+            
+            <div class="legend-box">
+                <div class="legend-item"><span class="dot" style="background:#ef4444"></span> North (Red Marker)</div>
+                <div class="legend-item"><span class="dot" style="background:var(--accent)"></span> Sun Position</div>
+                <div class="legend-item"><span class="line-sample" style="background:var(--path-day)"></span> Day Path (Above Horizon)</div>
+                <div class="legend-item"><span class="line-sample" style="background:#334155"></span> Night Path (Below Horizon)</div>
+                <div class="legend-item" style="margin-top:5px; font-style:italic;">Center is Zenith (90°). Outer edge is Horizon (0°).</div>
+            </div>
+        </div>
+
+        <!-- Controls Area -->
+        <div class="controls">
+            
+            <!-- Quick City Selector -->
+            <div class="control-group">
+                <div class="label-row"><span>Quick Select City</span></div>
+                <select id="citySelector">
+                    <option value="" disabled>-- Select a City --</option>
+                    <option value="-54.8">Ushuaia, Argentina (54.8°S)</option>
+                    <option value="-45.9">Comodoro Rivadavia, Argentina (45.9°S)</option>
+                    <option value="-34.6" selected>Buenos Aires, Argentina (34.6°S)</option>
+                    <option value="-24.8">Salta, Argentina (24.8°S)</option>
+                    <option value="-22.9">Rio de Janeiro, Brazil (22.9°S)</option>
+                    <option value="-0.2">Quito, Ecuador (0.2°S)</option>
+                    <option value="40.7">New York, USA (40.7°N)</option>
+                    <option value="41.4">Barcelona, Spain (41.4°N)</option>
+                    <option value="59.3">Stockholm, Sweden (59.3°N)</option>
+                </select>
+            </div>
+
+            <!-- Latitude -->
+            <div class="control-group">
+                <div class="label-row">
+                    <span>Latitude</span>
+                    <span class="val" id="latVal">-34.6°</span>
+                </div>
+                <input type="range" id="latInput" min="-90" max="90" step="0.1" value="-34.6">
+            </div>
+
+            <!-- Date -->
+            <div class="control-group">
+                <div class="label-row">
+                    <span>Date</span>
+                    <span class="val" id="dateVal">Feb 18</span>
+                </div>
+                <input type="range" id="dayInput" min="1" max="365" value="49">
+            </div>
+
+            <!-- Time -->
+            <div class="control-group">
+                <div class="label-row">
+                    <span>Time of Day</span>
+                    <span class="val" id="timeVal">12:00</span>
+                </div>
+                <input type="range" id="timeInput" min="0" max="23.99" step="0.01" value="12">
+            </div>
+
+            <!-- Readouts -->
+            <div class="readout-grid">
+                <div class="readout-item">
+                    <div class="readout-label">Altitude</div>
+                    <div class="readout-value" id="altReadout">--</div>
+                </div>
+                <div class="readout-item">
+                    <div class="readout-label">Azimuth</div>
+                    <div class="readout-value" id="azReadout">--</div>
+                </div>
+                <div class="readout-item">
+                    <div class="readout-label">Sun Declination</div>
+                    <div class="readout-value" id="decReadout">--</div>
+                </div>
+                <div class="readout-item">
+                    <div class="readout-label">Day Length</div>
+                    <div class="readout-value" id="dayLenReadout">--</div>
+                </div>
+            </div>
+
+            <div class="note" id="insightBox">
+                Adjust sliders to explore seasonal changes.
+            </div>
+        </div>
+    </div>
+
+<script>
+    /* =========================================
+       1. CONFIGURATION & CONSTANTS
+       ========================================= */
+    const THEME = {
+        grid: '#334155',
+        pathNight: '#334155',
+        pathDay: '#3b82f6',
+        sunDay: '#f59e0b',
+        sunRiseSet: '#ef4444',
+        sunNight: '#475569',
+        azimuthLineDay: 'rgba(245, 158, 11, 0.4)',
+        azimuthLineNight: 'rgba(51, 65, 85, 0.5)'
+    };
+
+    /* =========================================
+       2. DOM ELEMENTS CACHE
+       ========================================= */
+    const DOM = {
+        canvas: document.getElementById('skyCanvas'),
+        inputs: {
+            lat: document.getElementById('latInput'),
+            day: document.getElementById('dayInput'),
+            time: document.getElementById('timeInput'),
+            city: document.getElementById('citySelector')
+        },
+        displays: {
+            lat: document.getElementById('latVal'),
+            date: document.getElementById('dateVal'),
+            time: document.getElementById('timeVal'),
+            alt: document.getElementById('altReadout'),
+            az: document.getElementById('azReadout'),
+            dec: document.getElementById('decReadout'),
+            dayLen: document.getElementById('dayLenReadout'),
+            insight: document.getElementById('insightBox')
+        }
+    };
+
+    const CTX = DOM.canvas.getContext('2d');
+    const CANVAS_CENTER = { x: DOM.canvas.width / 2, y: DOM.canvas.height / 2 };
+    const CANVAS_RADIUS = DOM.canvas.width / 2 - 20;
+
+    /* =========================================
+       3. MATH & SOLAR PHYSICS
+       ========================================= */
+    const SolarMath = {
+        deg2rad: d => d * (Math.PI / 180),
+        rad2deg: r => r * (180 / Math.PI),
+        
+        // Approximate day of year string
+        getDateString: (dayOfYear) => {
+            const date = new Date(2023, 0); 
+            date.setDate(dayOfYear);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        },
+
+        // Core physics calculation
+        calculatePosition: (lat, dayOfYear, hour) => {
+            const deg2rad = SolarMath.deg2rad;
+            const rad2deg = SolarMath.rad2deg;
+
+            // 1. Declination: 23.45 * sin(360/365 * (d - 81))
+            const declination = 23.45 * Math.sin(deg2rad(360/365 * (dayOfYear - 81)));
+
+            // 2. Hour Angle (H): 15 deg per hour from noon
+            const H = 15 * (hour - 12);
+
+            // 3. Coordinate conversion
+            const latRad = deg2rad(lat);
+            const decRad = deg2rad(declination);
+            const HRad = deg2rad(H);
+
+            const sinAlt = Math.sin(latRad) * Math.sin(decRad) + Math.cos(latRad) * Math.cos(decRad) * Math.cos(HRad);
+            const altRad = Math.asin(sinAlt);
+            const altitude = rad2deg(altRad);
+
+            // 4. Azimuth calculation
+            let azimuth = 0;
+            if (Math.abs(Math.cos(altRad)) > 0.0001) {
+                const cosAz = (Math.sin(decRad) - Math.sin(altRad) * Math.sin(latRad)) / (Math.cos(altRad) * Math.cos(latRad));
+                const clamped = Math.max(-1, Math.min(1, cosAz));
+                const A = rad2deg(Math.acos(clamped));
+                azimuth = (Math.sin(HRad) > 0) ? 360 - A : A;
+            }
+
+            return { altitude, azimuth, declination };
+        }
+    };
+
+    /* =========================================
+       4. GRAPHICS & RENDERING
+       ========================================= */
+    const Graphics = {
+        clear: () => CTX.clearRect(0, 0, DOM.canvas.width, DOM.canvas.height),
+
+        // Utility to map Altitude/Azimuth to Canvas X/Y
+        polarToCartesian: (alt, az) => {
+            // Map altitude: 90° is center (r=0), 0° is edge (r=radius)
+            // Allow negative altitude for drawing below horizon logic
+            const r = CANVAS_RADIUS * (1 - alt / 90);
+            
+            // Map Azimuth: N(0) is Up(-90 in canvas). Canvas 0 is Right.
+            // Formula: theta = az - 90
+            const theta = SolarMath.deg2rad(az - 90);
+            
+            return {
+                x: CANVAS_CENTER.x + r * Math.cos(theta),
+                y: CANVAS_CENTER.y + r * Math.sin(theta)
+            };
+        },
+
+        drawGrid: () => {
+            CTX.lineWidth = 2;
+            CTX.strokeStyle = THEME.grid;
+            
+            // Horizon
+            CTX.beginPath();
+            CTX.arc(CANVAS_CENTER.x, CANVAS_CENTER.y, CANVAS_RADIUS, 0, Math.PI * 2);
+            CTX.stroke();
+
+            // Altitude Rings (30, 60)
+            CTX.lineWidth = 1;
+            CTX.setLineDash([5, 5]);
+            [30, 60].forEach(deg => {
+                const r = CANVAS_RADIUS * (1 - deg/90);
+                CTX.beginPath();
+                CTX.arc(CANVAS_CENTER.x, CANVAS_CENTER.y, r, 0, Math.PI * 2);
+                CTX.stroke();
+            });
+            CTX.setLineDash([]);
+
+            // Crosshairs
+            CTX.beginPath();
+            CTX.moveTo(CANVAS_CENTER.x - CANVAS_RADIUS, CANVAS_CENTER.y);
+            CTX.lineTo(CANVAS_CENTER.x + CANVAS_RADIUS, CANVAS_CENTER.y);
+            CTX.moveTo(CANVAS_CENTER.x, CANVAS_CENTER.y - CANVAS_RADIUS);
+            CTX.lineTo(CANVAS_CENTER.x, CANVAS_CENTER.y + CANVAS_RADIUS);
+            CTX.stroke();
+        },
+
+        // Generic path drawer that accepts a filter function to decide when to draw
+        drawPath: (lat, day, color, width, conditionFn = () => true) => {
+            CTX.beginPath();
+            CTX.strokeStyle = color;
+            CTX.lineWidth = width;
+
+            let isDrawing = false;
+            
+            // Loop 0-24h
+            for (let h = 0; h <= 24.1; h += 0.1) {
+                const pos = SolarMath.calculatePosition(lat, day, h);
+                
+                if (conditionFn(pos)) {
+                    const coords = Graphics.polarToCartesian(pos.altitude, pos.azimuth);
+                    
+                    if (!isDrawing) {
+                        CTX.moveTo(coords.x, coords.y);
+                        isDrawing = true;
+                    } else {
+                        CTX.lineTo(coords.x, coords.y);
+                    }
+                } else {
+                    // Break line if condition fails (e.g. sun goes below horizon)
+                    if (isDrawing) {
+                        CTX.stroke();
+                        CTX.beginPath();
+                        isDrawing = false;
+                    }
+                }
+            }
+            if (isDrawing) CTX.stroke();
+        },
+
+        drawSun: (pos) => {
+            const coords = Graphics.polarToCartesian(pos.altitude, pos.azimuth);
+            const isDay = pos.altitude > -0.5;
+
+            // Azimuth Line
+            CTX.beginPath();
+            CTX.moveTo(CANVAS_CENTER.x, CANVAS_CENTER.y);
+            CTX.lineTo(coords.x, coords.y);
+            CTX.strokeStyle = isDay ? THEME.azimuthLineDay : THEME.azimuthLineNight;
+            CTX.lineWidth = 1;
+            CTX.stroke();
+
+            // Sun Body
+            CTX.beginPath();
+            CTX.arc(coords.x, coords.y, 8, 0, Math.PI * 2);
+            
+            let fill = THEME.sunNight;
+            if (isDay) {
+                fill = (pos.altitude < 5) ? THEME.sunRiseSet : THEME.sunDay;
+            }
+            CTX.fillStyle = fill;
+            CTX.fill();
+
+            // Glow (Day only)
+            if (pos.altitude > 0) {
+                CTX.beginPath();
+                CTX.arc(coords.x, coords.y, 15, 0, Math.PI * 2);
+                CTX.fillStyle = THEME.accentGlow;
+                CTX.fill();
+            }
+        }
+    };
+
+    /* =========================================
+       5. MAIN APP LOGIC
+       ========================================= */
+    function updateApp() {
+        // 1. Get State
+        const lat = parseFloat(DOM.inputs.lat.value);
+        const day = parseInt(DOM.inputs.day.value);
+        const time = parseFloat(DOM.inputs.time.value);
+
+        // 2. Calculations
+        const currentPos = SolarMath.calculatePosition(lat, day, time);
+        const dayLength = calculateDayLength(lat, day);
+
+        // 3. Render Canvas
+        Graphics.clear();
+        Graphics.drawGrid();
+        
+        // Pass 1: Night Path (Full Loop)
+        Graphics.drawPath(lat, day, THEME.pathNight, 2);
+        
+        // Pass 2: Day Path (Only Alt > -0.5)
+        Graphics.drawPath(lat, day, THEME.pathDay, 3, (pos) => pos.altitude > -0.5);
+        
+        // Sun Marker
+        Graphics.drawSun(currentPos);
+
+        // 4. Update DOM UI
+        updateUI(lat, day, time, currentPos, dayLength);
+    }
+
+    function calculateDayLength(lat, day) {
+        // Simple search for rise/set times
+        let rise = null, set = null;
+        for (let h = 0; h <= 24; h += 0.1) {
+            const p = SolarMath.calculatePosition(lat, day, h);
+            if (p.altitude > 0) {
+                if (rise === null) rise = h;
+                set = h;
+            }
+        }
+        
+        if (rise === null) return { type: 'polar_night' };
+        if (Math.abs(set - rise) > 23.8) return { type: 'polar_day' };
+        
+        return { type: 'normal', hours: set - rise };
+    }
+
+    function updateUI(lat, day, time, pos, dayInfo) {
+        // Formatted Time
+        const hrs = Math.floor(time);
+        const mins = Math.floor((time - hrs) * 60);
+        const timeStr = `${hrs.toString().padStart(2,'0')}:${mins.toString().padStart(2,'0')}`;
+
+        // Basic Values
+        DOM.displays.lat.innerText = lat + "°";
+        DOM.displays.date.innerText = SolarMath.getDateString(day);
+        DOM.displays.time.innerText = timeStr;
+        DOM.displays.alt.innerText = pos.altitude.toFixed(1) + "°";
+        DOM.displays.az.innerText = pos.azimuth.toFixed(1) + "°";
+        DOM.displays.dec.innerText = pos.declination.toFixed(1) + "°";
+
+        // Day Length
+        if (dayInfo.type === 'normal') {
+            const hL = Math.floor(dayInfo.hours);
+            const mL = Math.floor((dayInfo.hours - hL) * 60);
+            DOM.displays.dayLen.innerText = `${hL}h ${mL}m`;
+        } else {
+            DOM.displays.dayLen.innerText = (dayInfo.type === 'polar_day') 
+                ? "24h (Polar Day)" 
+                : "0h (Polar Night)";
+        }
+
+        // Insights / Instructions
+        updateInsights(lat, day, pos);
+    }
+
+    function updateInsights(lat, day, pos) {
+        let text = "";
+        const isBA = Math.abs(lat - (-34.6)) < 2;
+        const isFeb18 = Math.abs(day - 49) < 5;
+
+        // Custom Insight for the specific user request
+        if (isBA && isFeb18) {
+            if (pos.altitude < 5 && pos.altitude > -5 && pos.azimuth > 180) {
+                text = `🌅 <strong>Feb 18 Insight:</strong> Notice the Sunset Azimuth is ~250° (South-West). <br>Since the Sun's Declination is still South (-11°), it stays in the Southern sky longer, setting South of West.`;
+            } else if (pos.altitude > 60) {
+                text = `☀️ <strong>Solar Noon:</strong> Look North! The Sun culminates at ~67° altitude. It is "below" the Zenith because you are further South than the Sun.`;
+            } else {
+                text = `Observation: In Buenos Aires (Feb 18), the Sun rises in the SE, crosses the Northern sky, and sets in the SW.`;
+            }
+        } else {
+            // General Insights
+            if (lat < -50 && day < 30) text = "High Southern Latitude: Notice the very long days in Summer.";
+            else if (lat > 50 && day < 30) text = "High Northern Latitude: Short winter days. Sun stays low in the South.";
+            else if (Math.abs(lat) < 5) text = "Equator: Days are consistently ~12 hours long year-round.";
+            else if (lat < 0) text = "Southern Hemisphere: Sun tracks through the Northern sky.";
+            else text = "Northern Hemisphere: Sun tracks through the Southern sky.";
+        }
+        DOM.displays.insight.innerHTML = text;
+    }
+
+    /* =========================================
+       6. INITIALIZATION & EVENTS
+       ========================================= */
+    
+    // Wire up inputs
+    Object.values(DOM.inputs).forEach(input => {
+        // Handle city selector specifically
+        if (input.id === 'citySelector') {
+            input.addEventListener('change', (e) => {
+                DOM.inputs.lat.value = e.target.value;
+                updateApp();
+            });
+        } else {
+            input.addEventListener('input', updateApp);
+        }
+    });
+
+    // Start
+    updateApp();
+
+</script>
+</body>
+</html>
